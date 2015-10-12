@@ -1,7 +1,7 @@
 import datetime
 import logging
+import os.path
 import requests
-
 
 class SlackError(Exception):
     pass
@@ -20,7 +20,7 @@ class SlackClient(object):
     def _channel_is_name(self, channel):
         return channel.startswith('#')
 
-    def _make_request(self, method, params):
+    def _make_request(self, method, params, files = None):
         """Make request to API endpoint
 
         Note: Ignoring SSL cert validation due to intermittent failures
@@ -33,7 +33,7 @@ class SlackClient(object):
 
         url = "%s/%s" % (SlackClient.BASE_URL, method)
         params['token'] = self.token
-        response = requests.post(url, data=params, verify=self.verify)
+        response = requests.post(url, data=params, files=files, verify=self.verify)
 
         if response.status_code == 429:
             # Too many requests
@@ -108,6 +108,25 @@ class SlackClient(object):
         })
         return self._make_request(method, params)
 
+    def post_file(self, file_path, **params):
+        """files.upload
+
+        This method allows you to create or upload an existing file.
+
+        Required parameters:
+            `file_path`: Uploaded file full path
+
+        https://api.slack.com/methods/files.upload
+        """
+
+        method = 'files.upload'
+
+        if os.path.isfile(file_path):
+            with open(file_path, 'rb') as f:
+                files = {'file': f}
+                return self._make_request(method, params, files)
+        else:
+            raise SlackError("File not found")    
 
 class SlackHandler(logging.Handler):
     """A logging handler that posts messages to a Slack channel!
